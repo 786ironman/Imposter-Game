@@ -528,6 +528,27 @@ select option{background:var(--s2)}
       <div class="cat-grid" id="cat-grid"></div>
     </div>
 
+    <!-- Owner controls — only visible to owner -->
+    <div class="card" id="owner-controls-card" style="display:none;border-color:rgba(255,214,10,0.25)">
+      <div class="card-label" style="color:var(--gold)">👑 Owner controls</div>
+      <div class="setting-row" style="border-bottom:none">
+        <div>
+          <div style="font-size:14px;font-weight:600;margin-bottom:2px">Guest room creation</div>
+          <div style="font-size:12px;color:var(--muted)" id="guest-toggle-label">OFF — only you can create rooms</div>
+        </div>
+        <label style="position:relative;display:inline-block;width:50px;height:28px;flex-shrink:0">
+          <input type="checkbox" id="guest-host-toggle" style="opacity:0;width:0;height:0;margin:0"
+            onchange="setGuestHostFlag(this.checked)">
+          <span id="toggle-track" onclick="document.getElementById('guest-host-toggle').click()"
+            style="position:absolute;cursor:pointer;inset:0;background:var(--border2);border-radius:28px;transition:0.3s">
+            <span id="toggle-thumb"
+              style="position:absolute;width:22px;height:22px;left:3px;bottom:3px;background:var(--muted);border-radius:50%;transition:0.3s"></span>
+          </span>
+        </label>
+      </div>
+      <div class="status" id="owner-ctrl-status"></div>
+    </div>
+
     <div style="height:80px"></div>
   </div>
   <div class="bottom-action">
@@ -1259,23 +1280,41 @@ function renderPlayerChips(containerId, playerList, myId) {
 }
 
 // ═══════════════════════════════════════════════════════
-// OWNER SYSTEM — URL based
-// Your private link: https://786ironman.github.io/Imposter-Game/?host=ironman786
-// Change OWNER_SECRET below to whatever you want, keep it secret!
+// OWNER & GUEST ROOM CREATION CONTROL SYSTEM
 // ═══════════════════════════════════════════════════════
-const OWNER_SECRET = 'ironman786'; // ← CHANGE THIS to your secret word
+
+// ── CONFIGURE THESE ──────────────────────────────────
+const OWNER_SECRET   = 'ironman786';       // your secret — used in your private URL
+const GITHUB_USER    = '786ironman';        // your GitHub username
+const GITHUB_REPO    = 'Imposter-Game';    // your repo name
+const GITHUB_TOKEN   = '';                 // paste your GitHub token here after generating it
+// ─────────────────────────────────────────────────────
+
+// This flag is toggled by owner. Guests read it on page load.
+// DO NOT EDIT THIS LINE MANUALLY — owner app writes to it via GitHub API:
+const GUEST_HOST_ALLOWED = false; //GUEST_HOST_FLAG
 
 let ownerUnlocked = false;
 
 function initOwnerSystem() {
   const params = new URLSearchParams(location.search);
-  const hostParam = params.get('host');
-  if (hostParam === OWNER_SECRET) {
-    // Save to session so refreshing keeps owner mode
+
+  // If ?host=SECRET in URL → owner mode, save to session
+  if (params.get('host') === OWNER_SECRET) {
     sessionStorage.setItem('ownerUnlocked', OWNER_SECRET);
+    // Clean URL so secret not visible in address bar
+    const cleanUrl = location.pathname + (params.get('room') ? '?room='+params.get('room') : '');
+    history.replaceState({}, '', cleanUrl);
   }
+
   if (sessionStorage.getItem('ownerUnlocked') === OWNER_SECRET) {
     unlockOwner();
+    return;
+  }
+
+  // Guest: show host panel only if owner has enabled it
+  if (GUEST_HOST_ALLOWED) {
+    showGuestHostPanel();
   }
 }
 
@@ -1283,8 +1322,88 @@ function unlockOwner() {
   ownerUnlocked = true;
   document.getElementById('host-panel').style.display = 'block';
   document.getElementById('owner-badge').style.display = 'block';
+  document.getElementById('owner-controls-card').style.display = 'block';
   const aiRow = document.getElementById('src-ai-row');
   if (aiRow) aiRow.style.display = 'flex';
+  // Load current toggle state from the live file
+  loadGuestToggleState();
+}
+
+function showGuestHostPanel() {
+  // Show host panel but without owner controls or AI
+  document.getElementById('host-panel').style.display = 'block';
+}
+
+// ── GITHUB API: read current flag state ──────────────
+async function loadGuestToggleState() {
+  const toggle = document.getElementById('guest-host-toggle');
+  if (!toggle) return;
+  // Read from the flag already baked into this page load
+  toggle.checked = GUEST_HOST_ALLOWED;
+  document.getElementById('guest-toggle-label').textContent = GUEST_HOST_ALLOWED ? 'ON — guests can create rooms' : 'OFF — only you can create rooms';
+}
+
+// ── GITHUB API: update flag in index.html ────────────
+async function setGuestHostFlag(allowed) {
+  const toggle = document.getElementById('guest-host-toggle');
+  const statusEl = document.getElementById('owner-ctrl-status');
+  if (!GITHUB_TOKEN) {
+    setElStatus(statusEl, '✕ Add your GitHub token to the file first', 'err');
+    toggle.checked = !allowed; return;
+  }
+  setElStatus(statusEl, '⟳ Saving…', '');
+
+  try {
+    // 1. Get current file SHA + content
+    const getResp = await fetch(
+      `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/index.html`,
+      { headers: { Authorization: `token ${GITHUB_TOKEN}`, Accept: 'application/vnd.github.v3+json' } }
+    );
+    if (!getResp.ok) throw new Error('Could not read file: ' + getResp.status);
+    const fileData = await getResp.json();
+    const sha = fileData.sha;
+    let fileContent = atob(fileData.content.replace(/
+/g, ''));
+
+    // 2. Flip the flag
+    const flagTrue  = 'const GUEST_HOST_ALLOWED = true; //GUEST_HOST_FLAG';
+    const flagFalse = 'const GUEST_HOST_ALLOWED = false; //GUEST_HOST_FLAG';
+    const newFlag   = allowed ? flagTrue : flagFalse;
+    if (fileContent.includes(flagTrue))  fileContent = fileContent.replace(flagTrue,  newFlag);
+    else if (fileContent.includes(flagFalse)) fileContent = fileContent.replace(flagFalse, newFlag);
+    else { setElStatus(statusEl, '✕ Flag marker not found in file', 'err'); return; }
+
+    // 3. Push update
+    const putResp = await fetch(
+      `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/index.html`,
+      {
+        method: 'PUT',
+        headers: { Authorization: `token ${GITHUB_TOKEN}`, Accept: 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: allowed ? 'Enable guest room creation' : 'Disable guest room creation',
+          content: btoa(unescape(encodeURIComponent(fileContent))),
+          sha
+        })
+      }
+    );
+    if (!putResp.ok) {
+      const err = await putResp.json();
+      throw new Error(err.message || putResp.status);
+    }
+    document.getElementById('guest-toggle-label').textContent = allowed
+      ? 'ON — guests can create rooms'
+      : 'OFF — only you can create rooms';
+    setElStatus(statusEl, '✓ Saved! Takes ~30 seconds to update live', 'ok');
+  } catch(e) {
+    setElStatus(statusEl, '✕ Error: ' + e.message, 'err');
+    toggle.checked = !allowed;
+  }
+}
+
+function setElStatus(el, msg, type) {
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'status' + (type ? ' '+type : '');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1293,6 +1412,24 @@ function unlockOwner() {
 window.addEventListener('load', () => {
   // Owner system
   initOwnerSystem();
+
+  // Wire up toggle visual
+  const ghToggle = document.getElementById('guest-host-toggle');
+  const ghTrack  = document.getElementById('toggle-track');
+  const ghThumb  = document.getElementById('toggle-thumb');
+  if (ghToggle) {
+    ghToggle.addEventListener('change', function() {
+      if (this.checked) {
+        ghTrack.style.background = 'var(--green)';
+        ghThumb.style.transform = 'translateX(22px)';
+        ghThumb.style.background = '#fff';
+      } else {
+        ghTrack.style.background = 'var(--border2)';
+        ghThumb.style.transform = 'translateX(0)';
+        ghThumb.style.background = 'var(--muted)';
+      }
+    });
+  }
 
   // Register SW
   if ('serviceWorker' in navigator) {
