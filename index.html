@@ -816,7 +816,16 @@ function doHost() {
   myName = name; roomPw = pw; roomCode = genCode();
   isHost = true; myId = 'HOST_' + roomCode;
   setStatus('host-status','Connecting…');
-  peer = new Peer(myId, {debug:0});
+  peer = new Peer(myId, {debug:0, config:{
+    iceServers:[
+      {urls:'stun:stun.l.google.com:19302'},
+      {urls:'stun:stun1.l.google.com:19302'},
+      {urls:'stun:stun2.l.google.com:19302'},
+      {urls:'turn:openrelay.metered.ca:80',username:'openrelayproject',credential:'openrelayproject'},
+      {urls:'turn:openrelay.metered.ca:443',username:'openrelayproject',credential:'openrelayproject'},
+      {urls:'turn:openrelay.metered.ca:443?transport=tcp',username:'openrelayproject',credential:'openrelayproject'},
+    ]
+  }});
   peer.on('open', () => {
     players = [{ id:myId, name:myName }];
     shareUrl = buildShareUrl(roomCode);
@@ -1163,7 +1172,16 @@ function doJoin() {
   if (!pw)   { setStatus('join-status','Enter password','err'); return; }
   myName=name; roomCode=code;
   setStatus('join-status','Connecting…');
-  peer = new Peer(undefined, {debug:0});
+  peer = new Peer(undefined, {debug:0, config:{
+    iceServers:[
+      {urls:'stun:stun.l.google.com:19302'},
+      {urls:'stun:stun1.l.google.com:19302'},
+      {urls:'stun:stun2.l.google.com:19302'},
+      {urls:'turn:openrelay.metered.ca:80',username:'openrelayproject',credential:'openrelayproject'},
+      {urls:'turn:openrelay.metered.ca:443',username:'openrelayproject',credential:'openrelayproject'},
+      {urls:'turn:openrelay.metered.ca:443?transport=tcp',username:'openrelayproject',credential:'openrelayproject'},
+    ]
+  }});
   peer.on('open', pid => {
     myId = pid;
     hostConn = peer.connect('HOST_'+code, {reliable:true});
