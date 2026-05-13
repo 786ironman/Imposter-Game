@@ -425,6 +425,27 @@ select option{background:var(--s2)}
       </div>
     </div>
 
+    <!-- OWNER CONTROLS — visible only to owner on landing -->
+    <div class="card" id="owner-controls-card" style="display:none;border-color:rgba(255,214,10,0.25);margin-bottom:12px">
+      <div class="card-label" style="color:var(--gold)">👑 Global controls</div>
+      <div class="setting-row" style="border-bottom:none">
+        <div>
+          <div style="font-size:14px;font-weight:600;margin-bottom:2px">Guest room creation</div>
+          <div style="font-size:12px;color:var(--muted)" id="guest-toggle-label">OFF — only you can create rooms</div>
+        </div>
+        <label style="position:relative;display:inline-block;width:50px;height:28px;flex-shrink:0">
+          <input type="checkbox" id="guest-host-toggle" style="opacity:0;width:0;height:0;margin:0"
+            onchange="setGuestHostFlag(this.checked)">
+          <span id="toggle-track" onclick="document.getElementById('guest-host-toggle').click()"
+            style="position:absolute;cursor:pointer;inset:0;background:var(--border2);border-radius:28px;transition:0.3s">
+            <span id="toggle-thumb"
+              style="position:absolute;width:22px;height:22px;left:3px;bottom:3px;background:var(--muted);border-radius:50%;transition:0.3s"></span>
+          </span>
+        </label>
+      </div>
+      <div class="status" id="owner-ctrl-status"></div>
+    </div>
+
     <!-- JOIN PANEL — always visible -->
     <div class="card">
       <div class="card-label">Join a room</div>
@@ -526,27 +547,6 @@ select option{background:var(--s2)}
         <span class="ai-badge" id="ai-indicator" style="display:none"><span class="pulsing">●</span> AI</span>
       </div>
       <div class="cat-grid" id="cat-grid"></div>
-    </div>
-
-    <!-- Owner controls — only visible to owner -->
-    <div class="card" id="owner-controls-card" style="display:none;border-color:rgba(255,214,10,0.25)">
-      <div class="card-label" style="color:var(--gold)">👑 Owner controls</div>
-      <div class="setting-row" style="border-bottom:none">
-        <div>
-          <div style="font-size:14px;font-weight:600;margin-bottom:2px">Guest room creation</div>
-          <div style="font-size:12px;color:var(--muted)" id="guest-toggle-label">OFF — only you can create rooms</div>
-        </div>
-        <label style="position:relative;display:inline-block;width:50px;height:28px;flex-shrink:0">
-          <input type="checkbox" id="guest-host-toggle" style="opacity:0;width:0;height:0;margin:0"
-            onchange="setGuestHostFlag(this.checked)">
-          <span id="toggle-track" onclick="document.getElementById('guest-host-toggle').click()"
-            style="position:absolute;cursor:pointer;inset:0;background:var(--border2);border-radius:28px;transition:0.3s">
-            <span id="toggle-thumb"
-              style="position:absolute;width:22px;height:22px;left:3px;bottom:3px;background:var(--muted);border-radius:50%;transition:0.3s"></span>
-          </span>
-        </label>
-      </div>
-      <div class="status" id="owner-ctrl-status"></div>
     </div>
 
     <div style="height:80px"></div>
@@ -1325,7 +1325,6 @@ function unlockOwner() {
   document.getElementById('owner-controls-card').style.display = 'block';
   const aiRow = document.getElementById('src-ai-row');
   if (aiRow) aiRow.style.display = 'flex';
-  // Load current toggle state from the live file
   loadGuestToggleState();
 }
 
