@@ -393,32 +393,39 @@ select option{background:var(--s2)}
 <div class="toast" id="toast"></div>
 
 <!-- ══════════════════════════════════════════════════
-     SCREEN 1 — LANDING
+     SCREEN 1 — LANDING (guest join only by default)
 ══════════════════════════════════════════════════ -->
 <div class="screen active" id="s-landing">
   <div class="app-header">
-    <div class="app-logo">THE <em>IMPOSTER</em></div>
-    <div class="header-badge" id="pwa-badge">WEB</div>
+    <div class="app-logo" >THE <em>IMPOSTER</em></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="header-badge" id="pwa-badge">WEB</div>
+      <div id="owner-badge" style="display:none;font-size:10px;color:var(--gold);font-family:'DM Mono',monospace;letter-spacing:1px">👑 OWNER</div>
+    </div>
   </div>
   <div class="scroll-content" style="padding-top:20px">
-    <div class="card">
-      <div class="card-label">Host a new game</div>
-      <input type="text" id="host-name" placeholder="Your name" maxlength="18" autocomplete="off" />
-      <input type="password" id="host-pw" placeholder="Room password" maxlength="20" />
-      <div class="status" id="host-status"></div>
-    </div>
-    <div style="margin-bottom:12px">
-      <button class="btn btn-red btn-icon" onclick="doHost()">
-        <span>🎮</span><span>Create Room</span>
-      </button>
+
+    <!-- HOST PANEL — hidden unless owner unlocked -->
+    <div id="host-panel" style="display:none">
+      <div class="card" style="border-color:rgba(255,214,10,0.3)">
+        <div class="card-label" style="color:var(--gold)">👑 Host a new game</div>
+        <input type="text" id="host-name" placeholder="Your name" maxlength="18" autocomplete="off" />
+        <input type="password" id="host-pw" placeholder="Room password" maxlength="20" />
+        <div class="status" id="host-status"></div>
+      </div>
+      <div style="margin-bottom:12px">
+        <button class="btn btn-red btn-icon" onclick="doHost()">
+          <span>🎮</span><span>Create Room</span>
+        </button>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin:4px 0 16px">
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+        <span style="font-size:12px;color:var(--muted)">or join as player</span>
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+      </div>
     </div>
 
-    <div style="display:flex;align-items:center;gap:10px;margin:4px 0 16px">
-      <div style="flex:1;height:1px;background:var(--border)"></div>
-      <span style="font-size:12px;color:var(--muted)">or join</span>
-      <div style="flex:1;height:1px;background:var(--border)"></div>
-    </div>
-
+    <!-- JOIN PANEL — always visible -->
     <div class="card">
       <div class="card-label">Join a room</div>
       <input type="text" id="join-name" placeholder="Your name" maxlength="18" autocomplete="off" />
@@ -430,6 +437,8 @@ select option{background:var(--s2)}
     <button class="btn btn-ghost btn-icon" onclick="doJoin()">
       <span>🔗</span><span>Join Room</span>
     </button>
+
+
   </div>
 </div>
 
@@ -499,7 +508,7 @@ select option{background:var(--s2)}
           </label>
         </div>
       </div>
-      <div class="setting-row" style="border-bottom:none;padding-bottom:0;flex-direction:column;align-items:flex-start;gap:10px">
+      <div id="src-ai-row" class="setting-row" style="display:none;border-bottom:none;padding-bottom:0;flex-direction:column;align-items:flex-start;gap:10px">
         <span class="setting-label">Word source</span>
         <div style="display:flex;gap:8px;width:100%">
           <button class="btn btn-sm" id="src-builtin" onclick="setWordSource('builtin')"
@@ -1250,9 +1259,41 @@ function renderPlayerChips(containerId, playerList, myId) {
 }
 
 // ═══════════════════════════════════════════════════════
+// OWNER SYSTEM — URL based
+// Your private link: https://786ironman.github.io/Imposter-Game/?host=ironman786
+// Change OWNER_SECRET below to whatever you want, keep it secret!
+// ═══════════════════════════════════════════════════════
+const OWNER_SECRET = 'ironman786'; // ← CHANGE THIS to your secret word
+
+let ownerUnlocked = false;
+
+function initOwnerSystem() {
+  const params = new URLSearchParams(location.search);
+  const hostParam = params.get('host');
+  if (hostParam === OWNER_SECRET) {
+    // Save to session so refreshing keeps owner mode
+    sessionStorage.setItem('ownerUnlocked', OWNER_SECRET);
+  }
+  if (sessionStorage.getItem('ownerUnlocked') === OWNER_SECRET) {
+    unlockOwner();
+  }
+}
+
+function unlockOwner() {
+  ownerUnlocked = true;
+  document.getElementById('host-panel').style.display = 'block';
+  document.getElementById('owner-badge').style.display = 'block';
+  const aiRow = document.getElementById('src-ai-row');
+  if (aiRow) aiRow.style.display = 'flex';
+}
+
+// ═══════════════════════════════════════════════════════
 // PWA + URL AUTO-FILL
 // ═══════════════════════════════════════════════════════
 window.addEventListener('load', () => {
+  // Owner system
+  initOwnerSystem();
+
   // Register SW
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(()=>{});
